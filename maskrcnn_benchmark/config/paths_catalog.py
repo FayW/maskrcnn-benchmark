@@ -103,6 +103,16 @@ class DatasetCatalog(object):
         "cityscapes_fine_instanceonly_seg_test_cocostyle": {
             "img_dir": "cityscapes/images",
             "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
+        },
+        "multihand_train": {
+            "data_dir": "multihand/train",
+            #"ann_file": "multihand/train/via_region_data.json",
+            #"split": "train"
+        },
+        "multihand_val": {
+            "data_dir": "multihand/val",
+            #"ann_file": "multihand/val/via_region_data.json",
+            #"split": "val"
         }
     }
 
@@ -130,6 +140,18 @@ class DatasetCatalog(object):
                 factory="PascalVOCDataset",
                 args=args,
             )
+        elif "multihand" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                data_dir=os.path.join(data_dir, attrs["data_dir"]),
+                #ann_file=os.path.join(data_dir, attrs["ann_file"])
+            )
+            print('here attri {}'.format(args))
+            return dict(
+                factory="MultihandDataset",
+                args=args,
+            )        
         raise RuntimeError("Dataset not available: {}".format(name))
 
 

@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from maskrcnn_benchmark.layers import ROIAlign
+from mrcnn.layers import ROIAlign
 
 from .utils import cat
 

@@ -1,11 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-from maskrcnn_benchmark.structures.boxlist_ops import cat_boxlist
-from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
-from maskrcnn_benchmark.structures.boxlist_ops import remove_small_boxes
+from mrcnn.modeling.box_coder import BoxCoder
+from mrcnn.structures.bounding_box import BoxList
+from mrcnn.structures.boxlist_ops import cat_boxlist
+from mrcnn.structures.boxlist_ops import boxlist_nms
+from mrcnn.structures.boxlist_ops import remove_small_boxes
 
 from ..utils import cat
 from .utils import permute_and_flatten
@@ -165,7 +165,7 @@ class RPNPostProcessor(torch.nn.Module):
             box_sizes = [len(boxlist) for boxlist in boxlists]
             post_nms_top_n = min(self.fpn_post_nms_top_n, len(objectness))
             _, inds_sorted = torch.topk(objectness, post_nms_top_n, dim=0, sorted=True)
-            inds_mask = torch.zeros_like(objectness, dtype=torch.uint8)
+            inds_mask = torch.zeros_like(objectness, dtype=torch.bool)
             inds_mask[inds_sorted] = 1
             inds_mask = inds_mask.split(box_sizes)
             for i in range(num_images):

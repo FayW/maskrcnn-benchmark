@@ -3,11 +3,11 @@ from collections import OrderedDict
 
 from torch import nn
 
-from maskrcnn_benchmark.modeling import registry
-from maskrcnn_benchmark.modeling.make_layers import conv_with_kaiming_uniform
+from mrcnn.modeling import registry
+from mrcnn.modeling.make_layers import conv_with_kaiming_uniform
 from . import fpn as fpn_module
 from . import resnet
-
+from . import mbnetv2
 
 @registry.BACKBONES.register("R-50-C4")
 @registry.BACKBONES.register("R-50-C5")
@@ -20,6 +20,17 @@ def build_resnet_backbone(cfg):
     return model
 
 
+@registry.BACKBONES.register("MOBILENET")
+def build_mobilenet_backbone(cfg):
+    body = mbnetv2.mobilenetv2()
+    model = nn.Sequential(OrderedDict([("body", body)]))
+    model.out_channels = 1280
+    
+    for p in model.parameters():
+        p.requires_grad = False
+        
+    return model
+    
 @registry.BACKBONES.register("R-50-FPN")
 @registry.BACKBONES.register("R-101-FPN")
 @registry.BACKBONES.register("R-152-FPN")

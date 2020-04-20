@@ -22,11 +22,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from maskrcnn_benchmark.layers import FrozenBatchNorm2d
-from maskrcnn_benchmark.layers import Conv2d
-from maskrcnn_benchmark.layers import DFConv2d
-from maskrcnn_benchmark.modeling.make_layers import group_norm
-from maskrcnn_benchmark.utils.registry import Registry
+from mrcnn.layers import FrozenBatchNorm2d
+from mrcnn.layers import Conv2d
+from mrcnn.layers import DFConv2d
+from mrcnn.modeling.make_layers import group_norm
+from mrcnn.utils.registry import Registry
 
 
 # ResNet stage specification
@@ -145,10 +145,13 @@ class ResNet(nn.Module):
     def forward(self, x):
         outputs = []
         x = self.stem(x)
+        print('---> {}  ----> {}'.format(self.return_features,self.stages))
         for stage_name in self.stages:
             x = getattr(self, stage_name)(x)
             if self.return_features[stage_name]:
                 outputs.append(x)
+                print('hey! ',x.size())
+        print('----------------------------------')
         return outputs
 
 

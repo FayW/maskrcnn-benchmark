@@ -42,7 +42,7 @@ _C.INPUT = CN()
 # Size of the smallest side of the image during training
 _C.INPUT.MIN_SIZE_TRAIN = (800,)  # (800,)
 # Maximum size of the side of the image during training
-_C.INPUT.MAX_SIZE_TRAIN = 1333
+_C.INPUT.MAX_SIZE_TRAIN = 1024
 # Size of the smallest side of the image during testing
 _C.INPUT.MIN_SIZE_TEST = 800
 # Maximum size of the side of the image during testing
@@ -60,6 +60,9 @@ _C.INPUT.CONTRAST = 0.0
 _C.INPUT.SATURATION = 0.0
 _C.INPUT.HUE = 0.0
 
+# Flips
+_C.INPUT.HORIZONTAL_FLIP_PROB_TRAIN = 0.5
+_C.INPUT.VERTICAL_FLIP_PROB_TRAIN = 0.0
 
 # -----------------------------------------------------------------------------
 # Dataset
@@ -98,8 +101,6 @@ _C.MODEL.BACKBONE.CONV_BODY = "R-50-C4"
 
 # Add StopGrad at a specified stage so the bottom layers are frozen
 _C.MODEL.BACKBONE.FREEZE_CONV_BODY_AT = 2
-# GN for backbone
-_C.MODEL.BACKBONE.USE_GN = False
 
 
 # ---------------------------------------------------------------------------- #
@@ -208,12 +209,12 @@ _C.MODEL.ROI_HEADS.DETECTIONS_PER_IMG = 100
 
 
 _C.MODEL.ROI_BOX_HEAD = CN()
-_C.MODEL.ROI_BOX_HEAD.FEATURE_EXTRACTOR = "ResNet50Conv5ROIFeatureExtractor"
-_C.MODEL.ROI_BOX_HEAD.PREDICTOR = "FastRCNNPredictor"
+_C.MODEL.ROI_BOX_HEAD.FEATURE_EXTRACTOR = "FPN2MLPFeatureExtractor"
+_C.MODEL.ROI_BOX_HEAD.PREDICTOR = "FPNPredictor"
 _C.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION = 14
 _C.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO = 0
 _C.MODEL.ROI_BOX_HEAD.POOLER_SCALES = (1.0 / 16,)
-_C.MODEL.ROI_BOX_HEAD.NUM_CLASSES = 81
+_C.MODEL.ROI_BOX_HEAD.NUM_CLASSES = 2
 # Hidden layer dimension when using an MLP for the RoI box head
 _C.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM = 1024
 # GN
@@ -294,7 +295,7 @@ _C.MODEL.RESNETS.DEFORMABLE_GROUPS = 1
 _C.MODEL.RETINANET = CN()
 
 # This is the number of foreground classes and background.
-_C.MODEL.RETINANET.NUM_CLASSES = 81
+_C.MODEL.RETINANET.NUM_CLASSES = 2
 
 # Anchor aspect ratios to use
 _C.MODEL.RETINANET.ANCHOR_SIZES = (32, 64, 128, 256, 512)
@@ -407,7 +408,8 @@ _C.SOLVER.WARMUP_FACTOR = 1.0 / 3
 _C.SOLVER.WARMUP_ITERS = 500
 _C.SOLVER.WARMUP_METHOD = "linear"
 
-_C.SOLVER.CHECKPOINT_PERIOD = 2500
+_C.SOLVER.CHECKPOINT_PERIOD = 10000
+_C.SOLVER.TEST_PERIOD = 0
 
 # Number of images per batch
 # This is global, so if we have 8 GPUs and IMS_PER_BATCH = 16, each GPU will
@@ -426,6 +428,27 @@ _C.TEST.EXPECTED_RESULTS_SIGMA_TOL = 4
 _C.TEST.IMS_PER_BATCH = 8
 # Number of detections per image
 _C.TEST.DETECTIONS_PER_IMG = 100
+
+# ---------------------------------------------------------------------------- #
+# Test-time augmentations for bounding box detection
+# See configs/test_time_aug/e2e_mask_rcnn_R-50-FPN_1x.yaml for an example
+# ---------------------------------------------------------------------------- #
+_C.TEST.BBOX_AUG = CN()
+
+# Enable test-time augmentation for bounding box detection if True
+_C.TEST.BBOX_AUG.ENABLED = False
+
+# Horizontal flip at the original scale (id transform)
+_C.TEST.BBOX_AUG.H_FLIP = False
+
+# Each scale is the pixel size of an image's shortest side
+_C.TEST.BBOX_AUG.SCALES = ()
+
+# Max pixel size of the longer side
+_C.TEST.BBOX_AUG.MAX_SIZE = 4000
+
+# Horizontal flip at each scale
+_C.TEST.BBOX_AUG.SCALE_H_FLIP = False
 
 
 # ---------------------------------------------------------------------------- #

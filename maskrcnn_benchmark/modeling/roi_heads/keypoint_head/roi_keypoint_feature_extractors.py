@@ -1,10 +1,10 @@
 from torch import nn
 from torch.nn import functional as F
 
-from maskrcnn_benchmark.modeling import registry
-from maskrcnn_benchmark.modeling.poolers import Pooler
+from mrcnn.modeling import registry
+from mrcnn.modeling.poolers import Pooler
 
-from maskrcnn_benchmark.layers import Conv2d
+from mrcnn.layers import Conv2d
 
 
 @registry.ROI_KEYPOINT_FEATURE_EXTRACTORS.register("KeypointRCNNFeatureExtractor")

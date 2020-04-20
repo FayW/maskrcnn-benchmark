@@ -94,8 +94,8 @@ def heatmaps_to_keypoints(maps, rois):
     return np.transpose(xy_preds, [0, 2, 1]), end_scores
 
 
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
+from mrcnn.structures.bounding_box import BoxList
+from mrcnn.structures.keypoint import PersonKeypoints
 
 
 class Keypointer(object):

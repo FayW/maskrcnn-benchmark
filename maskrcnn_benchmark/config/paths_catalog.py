@@ -105,12 +105,12 @@ class DatasetCatalog(object):
             "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
         },
         "multihand_train": {
-            "data_dir": "multihand/train",
+            "data_dir": "mh_train/color",
             #"ann_file": "multihand/train/via_region_data.json",
             #"split": "train"
         },
         "multihand_val": {
-            "data_dir": "multihand/val",
+            "data_dir": "mh_val/color",
             #"ann_file": "multihand/val/via_region_data.json",
             #"split": "val"
         }
@@ -147,7 +147,6 @@ class DatasetCatalog(object):
                 data_dir=os.path.join(data_dir, attrs["data_dir"]),
                 #ann_file=os.path.join(data_dir, attrs["ann_file"])
             )
-            print('here attri {}'.format(args))
             return dict(
                 factory="MultihandDataset",
                 args=args,

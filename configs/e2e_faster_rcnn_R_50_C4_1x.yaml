@@ -1,12 +1,17 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  #WEIGHT: "pretrained_model/e2e_faster_rcnn_R_50_C4_1x_no_last_layers.pth"
+  WEIGHT: "model_0040000_0.052832.pth"
+  BACKBONE:
+    CONV_BODY: "R-50-C4"
   RPN:
-    PRE_NMS_TOP_N_TEST: 6000
-    POST_NMS_TOP_N_TEST: 1000
+    PRE_NMS_TOP_N_TEST: 300
+    POST_NMS_TOP_N_TEST: 300
+  RESNETS:
+    BACKBONE_OUT_CHANNELS: 1024
 DATASETS:
-  TRAIN: ("coco_2014_train", "coco_2014_valminusminival")
-  TEST: ("coco_2014_minival",)
+  TRAIN: ("multihand_val", )
+  TEST: ("multihand_val",)
 SOLVER:
   BASE_LR: 0.01
   WEIGHT_DECAY: 0.0001

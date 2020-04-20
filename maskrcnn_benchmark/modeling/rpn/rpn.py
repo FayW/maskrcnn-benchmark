@@ -3,9 +3,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from maskrcnn_benchmark.modeling import registry
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
-from maskrcnn_benchmark.modeling.rpn.retinanet.retinanet import build_retinanet
+from mrcnn.modeling import registry
+from mrcnn.modeling.box_coder import BoxCoder
+from mrcnn.modeling.rpn.retinanet.retinanet import build_retinanet
 from .loss import make_rpn_loss_evaluator
 from .anchor_generator import make_anchor_generator
 from .inference import make_rpn_postprocessor

@@ -3,12 +3,12 @@ import torch
 from ..inference import RPNPostProcessor
 from ..utils import permute_and_flatten
 
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
-from maskrcnn_benchmark.modeling.utils import cat
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-from maskrcnn_benchmark.structures.boxlist_ops import cat_boxlist
-from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
-from maskrcnn_benchmark.structures.boxlist_ops import remove_small_boxes
+from mrcnn.modeling.box_coder import BoxCoder
+from mrcnn.modeling.utils import cat
+from mrcnn.structures.bounding_box import BoxList
+from mrcnn.structures.boxlist_ops import cat_boxlist
+from mrcnn.structures.boxlist_ops import boxlist_nms
+from mrcnn.structures.boxlist_ops import remove_small_boxes
 
 
 class RetinaNetPostProcessor(RPNPostProcessor):
@@ -74,7 +74,6 @@ class RetinaNetPostProcessor(RPNPostProcessor):
         box_cls = box_cls.sigmoid()
 
         box_regression = permute_and_flatten(box_regression, N, A, 4, H, W)
-        box_regression = box_regression.reshape(N, -1, 4)
 
         num_anchors = A * H * W
 

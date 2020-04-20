@@ -9,13 +9,14 @@ import torch
 import torch.utils.data
 from PIL import Image
 import sys
-from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
+from torchvision.transforms import functional as F
+from mrcnn.structures.segmentation_mask import SegmentationMask
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
 
-from maskrcnn_benchmark.structures.bounding_box import BoxList
+from mrcnn.structures.bounding_box import BoxList
 
 ############################################################
 #  Bounding Boxes
@@ -79,14 +80,14 @@ class MultihandDataset(torch.utils.data.Dataset):
         # }
         # We mostly care about the x and y coordinates of each region
         # Note: In VIA 2.0, regions was changed from a dict to a list.
-        annotations = json.load(open(os.path.join(self.data_dir, "via_region_data.json")))
+        annotations = json.load(open(os.path.join(self.data_dir, "annotation.json")))
         #annotations = list(annotations)[0]
         annotations = list(annotations.values())  # don't need the dict keys
 
         # The VIA tool saves images in the JSON even if they don't have any
         # annotations. Skip unannotated images.
         annotations = [a for a in annotations if a['regions']]
-
+        count=0
         # Add images
         for a in annotations:
             # Get the x, y coordinaets of points of the polygons that make up
@@ -111,6 +112,8 @@ class MultihandDataset(torch.utils.data.Dataset):
             except:
                 print('skip image {}'.format(image_path))
                 continue
+            if self.check_valid_img(image_path) == False:
+                continue
             height, width = image.shape[:2]
             image_instance = {
                 #"id": image_id,
@@ -129,38 +132,37 @@ class MultihandDataset(torch.utils.data.Dataset):
                     print('bad mask {}'.format(i))
                     mask_OK=False
                     break
+            if len(polygons)==0:
+                assert(0)
+                mask_OK=False
             if mask_OK==True:
                 self.image_info.append(image_instance)
-        
+                count+=1
         cls = MultihandDataset.CLASSES
         self.class_to_ind = dict(zip(cls, range(len(cls))))
-                
+        print('Total {} images'.format(count))        
     def __len__(self):
         return len(self.image_info)
 
-    def load_image(self, image_idx):
-        """Load the specified image and return a [H,W,3] Numpy array.
-        """
-        # Load image
-        image = skimage.io.imread(self.image_info[image_idx]['path'])
-        # If grayscale. Convert to RGB for consistency.
-        if image.ndim != 3:
-            image = skimage.color.gray2rgb(image)
-        # If has an alpha channel, remove it for consistency
-        if image.shape[-1] == 4:
-            image = image[..., :3]
-        return image
-
+    def check_valid_img(self,img_path):
+        tmp=None
+        try:
+            raw_img = Image.open(img_path)
+            tmp=raw_img.size
+        except:
+            print('found bad image {}'.format(img_path))
+            return False
+        return True
+        
     def __getitem__(self, index):
         #img = self.load_image(index)
         img = Image.open(self.image_info[index]['path']).convert("RGB")
-        target = self.load_image_gt(index)
-        target = target.clip_to_image(remove_empty=True)
+        #print('img type {}'.format(type(img)))
+        target = self.get_groundtruth(index)
+        target = target.clip_to_image(remove_empty=False)
         if self.transforms is not None:
             img, target = self.transforms(img, target)
-
         return img, target, index
-
 
     def load_mask(self, image_idx):
         """Generate instance masks for an image.
@@ -175,18 +177,18 @@ class MultihandDataset(torch.utils.data.Dataset):
         # [height, width, instance_count]
         info = self.image_info[image_idx]
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
-                        dtype=np.uint8)
+                        dtype=np.bool)
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
-            try:
-                mask[rr, cc, i] = 1
-            except:
-                print('h {} w {} row {} col {}'.format(info["height"],info["width"],rr,cc))
+            #try:
+            mask[rr, cc, i] = 1
+            #except:
+            #    print('h {} w {} row {} col {}'.format(info["height"],info["width"],rr,cc))
 
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
-        return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+        return mask, np.ones([mask.shape[-1]], dtype=np.int32)
 
     def load_polygons(self, image_idx):
         """Generate instance masks for an image.
@@ -210,9 +212,10 @@ class MultihandDataset(torch.utils.data.Dataset):
             polys_pts.append([poly_pts])
         return polys_pts
    
+    def map_class_id_to_class_name(self, class_id):
+        return MultihandDataset.CLASSES[class_id]
 
-
-    def load_image_gt(self, idx):
+    def get_groundtruth(self, idx):
         """Load and return ground truth data for an image (image, mask, bounding boxes).
 
         augment: (deprecated. Use augmentation instead). If true, apply random
@@ -265,9 +268,7 @@ class MultihandDataset(torch.utils.data.Dataset):
         # Resize masks to smaller size to reduce memory usage
         #if use_mini_mask:
         #    mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
-
-        # Image meta data
-        #image_meta = compose_image_meta(image_id, original_shape, image.shape, window, scale, active_class_ids)
+        #target.add_field("difficult", 0)
 
         return target
         

@@ -5,8 +5,8 @@ from __future__ import division
 import os
 from collections import defaultdict
 import numpy as np
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
+from mrcnn.structures.bounding_box import BoxList
+from mrcnn.structures.boxlist_ops import boxlist_iou
 
 
 def do_voc_evaluation(dataset, predictions, output_folder, logger):
@@ -26,10 +26,10 @@ def do_voc_evaluation(dataset, predictions, output_folder, logger):
     result = eval_detection_voc(
         pred_boxlists=pred_boxlists,
         gt_boxlists=gt_boxlists,
-        iou_thresh=0.5,
+        iou_thresh=0.85,
         use_07_metric=True,
     )
-    result_str = "mAP: {:.4f}\n".format(result["map"])
+    result_str = "mAP: {:.4f}, recall:{}\n".format(result["map"],len(result["rec"][1]))
     for i, ap in enumerate(result["ap"]):
         if i == 0:  # skip background
             continue
@@ -60,7 +60,7 @@ def eval_detection_voc(pred_boxlists, gt_boxlists, iou_thresh=0.5, use_07_metric
         pred_boxlists=pred_boxlists, gt_boxlists=gt_boxlists, iou_thresh=iou_thresh
     )
     ap = calc_detection_voc_ap(prec, rec, use_07_metric=use_07_metric)
-    return {"ap": ap, "map": np.nanmean(ap)}
+    return {"ap": ap, "map": np.nanmean(ap),"rec":rec}
 
 
 def calc_detection_voc_prec_rec(gt_boxlists, pred_boxlists, iou_thresh=0.5):
@@ -79,8 +79,9 @@ def calc_detection_voc_prec_rec(gt_boxlists, pred_boxlists, iou_thresh=0.5):
         pred_score = pred_boxlist.get_field("scores").numpy()
         gt_bbox = gt_boxlist.bbox.numpy()
         gt_label = gt_boxlist.get_field("labels").numpy()
-        gt_difficult = gt_boxlist.get_field("difficult").numpy()
-
+        #gt_difficult = gt_boxlist.get_field("difficult").numpy()
+        #print('labe shapes {}'.format(gt_label.shape))
+        gt_difficult = np.zeros(gt_label.shape)
         for l in np.unique(np.concatenate((pred_label, gt_label)).astype(int)):
             pred_mask_l = pred_label == l
             pred_bbox_l = pred_bbox[pred_mask_l]
@@ -120,13 +121,13 @@ def calc_detection_voc_prec_rec(gt_boxlists, pred_boxlists, iou_thresh=0.5):
             selec = np.zeros(gt_bbox_l.shape[0], dtype=bool)
             for gt_idx in gt_index:
                 if gt_idx >= 0:
-                    if gt_difficult_l[gt_idx]:
-                        match[l].append(-1)
+                    #if gt_difficult_l[gt_idx]:
+                    #    match[l].append(-1)
+                    #else:
+                    if not selec[gt_idx]:
+                        match[l].append(1)
                     else:
-                        if not selec[gt_idx]:
-                            match[l].append(1)
-                        else:
-                            match[l].append(0)
+                        match[l].append(0)
                     selec[gt_idx] = True
                 else:
                     match[l].append(0)
@@ -151,7 +152,6 @@ def calc_detection_voc_prec_rec(gt_boxlists, pred_boxlists, iou_thresh=0.5):
         # If n_pos[l] is 0, rec[l] is None.
         if n_pos[l] > 0:
             rec[l] = tp / n_pos[l]
-
     return prec, rec
 
 

@@ -4,8 +4,8 @@ import copy
 import logging
 
 import torch.utils.data
-from maskrcnn_benchmark.utils.comm import get_world_size
-from maskrcnn_benchmark.utils.imports import import_file
+from mrcnn.utils.comm import get_world_size
+from mrcnn.utils.imports import import_file
 
 from . import datasets as D
 from . import samplers
@@ -31,6 +31,7 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True):
     datasets = []
     for dataset_name in dataset_list:
         data = dataset_catalog.get(dataset_name)
+        print('data {} ----> {}'.format(data,data["factory"]))
         factory = getattr(D, data["factory"])
         args = data["args"]
         # for COCODataset, we want to remove images without annotations
@@ -39,8 +40,11 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True):
             args["remove_images_without_annotations"] = is_train
         if data["factory"] == "PascalVOCDataset":
             args["use_difficult"] = not is_train
+        #if data["factory"] == "MultihandDataset":
+        #    args["use_difficult"] = False
         args["transforms"] = transforms
         # make dataset from factory
+        print('args {}'.format(args))
         dataset = factory(**args)
         datasets.append(dataset)
 

@@ -2,7 +2,7 @@
 import cv2
 import torch
 from torchvision import transforms as T
-
+import time
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.structures.image_list import to_image_list
@@ -129,6 +129,82 @@ class COCODemo(object):
         self.show_mask_heatmaps = show_mask_heatmaps
         self.masks_per_dim = masks_per_dim
 
+    # Original author: Francisco Massa:
+    # https://github.com/fmassa/object-detection.torch
+    # Ported to PyTorch by Max deGroot (02/01/2017)
+    def iou(self, box1, box2):
+        N = box1.size(0)
+        M = box2.size(0)
+
+        lt = torch.max(  # 左上角的点
+            box1[:, :2].unsqueeze(1).expand(N, M, 2),   # [N,2]->[N,1,2]->[N,M,2]
+            box2[:, :2].unsqueeze(0).expand(N, M, 2),   # [M,2]->[1,M,2]->[N,M,2]
+        )
+
+        rb = torch.min(
+            box1[:, 2:].unsqueeze(1).expand(N, M, 2),
+            box2[:, 2:].unsqueeze(0).expand(N, M, 2),
+        )
+
+        wh = rb - lt  # [N,M,2]
+        wh[wh < 0] = 0   # 两个box没有重叠区域
+        inter = wh[:,:,0] * wh[:,:,1]   # [N,M]
+
+        area1 = (box1[:,2]-box1[:,0]) * (box1[:,3]-box1[:,1])  # (N,)
+        area2 = (box2[:,2]-box2[:,0]) * (box2[:,3]-box2[:,1])  # (M,)
+        area1 = area1.unsqueeze(1).expand(N,M)  # (N,M)
+        area2 = area2.unsqueeze(0).expand(N,M)  # (N,M)
+
+        iou = inter / (area1+area2-inter)
+        return iou
+
+
+    def nms(self, bboxes, scores, threshold=0.5, top_k=200):
+        """Apply non-maximum suppression at test time to avoid detecting too many
+        overlapping bounding boxes for a given object.
+        Args:
+            boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
+            scores: (tensor) The class predscores for the img, Shape:[num_priors].
+            overlap: (float) The overlap thresh for suppressing unnecessary boxes.
+            top_k: (int) The Maximum number of box preds to consider.
+        Return:
+            The indices of the kept boxes with respect to num_priors.
+        """
+
+        x1 = bboxes[:,0]
+        y1 = bboxes[:,1]
+        x2 = bboxes[:,2]
+        y2 = bboxes[:,3]
+        areas = (x2-x1)*(y2-y1)   # [N,] 每个bbox的面积
+
+        _, order = scores.sort(0, descending=True)    # 降序排列
+
+        keep = []
+        while order.numel() > 0:       # torch.numel()返回张量元素个数
+            if order.numel() == 1:     # 保留框只剩一个
+                i = order.item()
+                keep.append(i)
+                break
+            else:
+                i = order[0].item()    # 保留scores最大的那个框box[i]
+                keep.append(i)
+
+            # 计算box[i]与其余各框的IOU(思路很好)
+            xx1 = x1[order[1:]].clamp(min=x1[i])   # [N-1,]
+            yy1 = y1[order[1:]].clamp(min=y1[i])
+            xx2 = x2[order[1:]].clamp(max=x2[i])
+            yy2 = y2[order[1:]].clamp(max=y2[i])
+            inter = (xx2-xx1).clamp(min=0) * (yy2-yy1).clamp(min=0)   # [N-1,]
+
+            #iou = inter / (areas[i]+areas[order[1:]]-inter)  # [N-1,]
+            iou = inter / areas[i]
+            idx = (iou <= threshold).nonzero().squeeze() # 注意此时idx为[N-1,] 而order为[N,]
+            if idx.numel() == 0:
+                break
+            order = order[idx+1]  # 修补索引之间的差值
+        return torch.LongTensor(keep)   # Pytorch的索引值为LongTensor
+
+
     def build_transform(self):
         """
         Creates a basic transformation that was used to train the models
@@ -139,7 +215,7 @@ class COCODemo(object):
         # to BGR, they are already! So all we need to do is to normalize
         # by 255 if we want to convert to BGR255 format, or flip the channels
         # if we want it to be in RGB in [0-1] range.
-        if cfg.INPUT.TO_BGR255:
+        if 0:
             to_bgr_transform = T.Lambda(lambda x: x * 255)
         else:
             to_bgr_transform = T.Lambda(lambda x: x[[2, 1, 0]])
@@ -151,7 +227,7 @@ class COCODemo(object):
         transform = T.Compose(
             [
                 T.ToPILImage(),
-                T.Resize(self.min_image_size),
+                #T.Resize((864,608)),
                 T.ToTensor(),
                 to_bgr_transform,
                 normalize_transform,
@@ -169,19 +245,22 @@ class COCODemo(object):
                 of the detection properties can be found in the fields of
                 the BoxList via `prediction.fields()`
         """
+        
         predictions = self.compute_prediction(image)
-        top_predictions = self.select_top_predictions(predictions)
-
-        result = image.copy()
-        if self.show_mask_heatmaps:
-            return self.create_mask_montage(result, top_predictions)
-        result = self.overlay_boxes(result, top_predictions)
-        if self.cfg.MODEL.MASK_ON:
+        
+        if 1:
+            top_predictions = self.select_top_predictions(predictions)
+        
+            result = image.copy()
+            #if self.show_mask_heatmaps:
+            #    return self.create_mask_montage(result, top_predictions)
+            result = self.overlay_boxes(result, top_predictions)
+            #if self.cfg.MODEL.MASK_ON:
             result = self.overlay_mask(result, top_predictions)
-        if self.cfg.MODEL.KEYPOINT_ON:
-            result = self.overlay_keypoints(result, top_predictions)
-        result = self.overlay_class_names(result, top_predictions)
-
+            #if self.cfg.MODEL.KEYPOINT_ON:
+            #    result = self.overlay_keypoints(result, top_predictions)
+            result = self.overlay_class_names(result, top_predictions)
+        
         return result
 
     def compute_prediction(self, original_image):
@@ -195,14 +274,20 @@ class COCODemo(object):
                 the BoxList via `prediction.fields()`
         """
         # apply pre-processing to image
+        s=time.time()
         image = self.transforms(original_image)
         # convert to an ImageList, padded so that it is divisible by
         # cfg.DATALOADER.SIZE_DIVISIBILITY
         image_list = to_image_list(image, self.cfg.DATALOADER.SIZE_DIVISIBILITY)
+        #print('---->t1 {}'.format(time.time()-s))
+        s=time.time()
         image_list = image_list.to(self.device)
+        
         # compute predictions
+        
         with torch.no_grad():
             predictions = self.model(image_list)
+        
         predictions = [o.to(self.cpu_device) for o in predictions]
 
         # always single image is passed at a time
@@ -210,7 +295,7 @@ class COCODemo(object):
 
         # reshape prediction (a BoxList) into the original image size
         height, width = original_image.shape[:-1]
-        prediction = prediction.resize((width, height))
+        #prediction = prediction.resize((width, height))
 
         if prediction.has_field("mask"):
             # if we have masks, paste the masks in the right position
@@ -219,6 +304,7 @@ class COCODemo(object):
             # always single image is passed at a time
             masks = self.masker([masks], [prediction])[0]
             prediction.add_field("mask", masks)
+        #print('------>t2 {}'.format(time.time()-s))
         return prediction
 
     def select_top_predictions(self, predictions):
@@ -236,9 +322,32 @@ class COCODemo(object):
                 the BoxList via `prediction.fields()`
         """
         scores = predictions.get_field("scores")
+
         keep = torch.nonzero(scores > self.confidence_threshold).squeeze(1)
+        #print('kp 1 {}'.format(keep))
+        # stripe low score predictions
         predictions = predictions[keep]
+        # stripe low scores
         scores = predictions.get_field("scores")
+        # nms for left scores
+        if 0:
+            keep=self.nms(predictions.bbox, scores, 0.5, 200)
+            #print('kp 2 {}'.format(keep))
+            predictions = predictions[keep]
+
+        if 0:
+            keep = []
+            masks = predictions.get_field("mask")
+            for i,mask in enumerate(masks):
+                #print(mask.shape)
+                if len(mask[mask==1])>400:
+                    keep.append(i)
+            #print('kp 3 {}'.format(keep))
+            predictions = predictions[keep]
+        
+
+            scores = predictions.get_field("scores")
+
         _, idx = scores.sort(0, descending=True)
         return predictions[idx]
 
@@ -268,7 +377,7 @@ class COCODemo(object):
             box = box.to(torch.int64)
             top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
             image = cv2.rectangle(
-                image, tuple(top_left), tuple(bottom_right), tuple(color), 1
+                image, tuple(top_left), tuple(bottom_right), tuple((255,125,125)), 2
             )
 
         return image
@@ -283,17 +392,26 @@ class COCODemo(object):
             predictions (BoxList): the result of the computation by the model.
                 It should contain the field `mask` and `labels`.
         """
+        mask_x=[]
+        mask_y=[]
         masks = predictions.get_field("mask").numpy()
         labels = predictions.get_field("labels")
+        for mask in masks:
+            res = np.where(mask[0] == 1)
+            mask_y.append(res[0])
+            mask_x.append(res[1])
 
-        colors = self.compute_colors_for_labels(labels).tolist()
-
-        for mask, color in zip(masks, colors):
-            thresh = mask[0, :, :, None]
-            contours, hierarchy = cv2_util.findContours(
-                thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-            )
-            image = cv2.drawContours(image, contours, -1, color, 3)
+        if 1:
+            colors = self.compute_colors_for_labels(labels).tolist()
+            for mask, color in zip(masks, colors):
+                thresh = mask[0, :, :, None]
+                contours, hierarchy = cv2_util.findContours(
+                    thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                )
+                image = cv2.drawContours(image, contours, -1, color, 3)
+                
+            for y,x in zip(mask_y,mask_x):
+                cv2.circle(image, (int(np.mean(x)), int(np.mean(y))), 10, (125, 255, 0), 4)            
 
         composite = image
 
@@ -328,12 +446,12 @@ class COCODemo(object):
         masks = masks[:max_masks]
         # handle case where we have less detections than max_masks
         if len(masks) < max_masks:
-            masks_padded = torch.zeros(max_masks, 1, height, width, dtype=torch.uint8)
+            masks_padded = torch.zeros(max_masks, 1, height, width, dtype=torch.bool)
             masks_padded[: len(masks)] = masks
             masks = masks_padded
         masks = masks.reshape(masks_per_dim, masks_per_dim, height, width)
         result = torch.zeros(
-            (masks_per_dim * height, masks_per_dim * width), dtype=torch.uint8
+            (masks_per_dim * height, masks_per_dim * width), dtype=torch.bool
         )
         for y in range(masks_per_dim):
             start_y = y * height

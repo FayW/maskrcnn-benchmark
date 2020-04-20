@@ -4,10 +4,10 @@ import os
 
 import torch
 
-from maskrcnn_benchmark.utils.model_serialization import load_state_dict
-from maskrcnn_benchmark.utils.c2_model_loading import load_c2_format
-from maskrcnn_benchmark.utils.imports import import_file
-from maskrcnn_benchmark.utils.model_zoo import cache_url
+from mrcnn.utils.model_serialization import load_state_dict
+from mrcnn.utils.c2_model_loading import load_c2_format
+from mrcnn.utils.imports import import_file
+from mrcnn.utils.model_zoo import cache_url
 
 
 class Checkpointer(object):
